@@ -17,7 +17,7 @@ Usage
 
 ##### Get all breaches for an account across all domains.
 
-```golang
+```go
 import (
     "github.com/mavjs/goPwned"
     )
@@ -29,7 +29,7 @@ func main() {
 
 ##### Get all breaches for an account across a particular domain.
 
-```golang
+```go
 import (
     "github.com/mavjs/goPwned"
     )
@@ -43,7 +43,7 @@ func main() {
 
 ##### Get all the details of each breach in the system
 
-```golang
+```go
 import (
     "github.com/mavjs/goPwned"
     )
@@ -55,7 +55,7 @@ func main() {
 
 ##### Get all the details of breached site
 
-```golang
+```go
 import (
     "github.com/mavjs/goPwned"
     )
@@ -67,7 +67,7 @@ func main() {
 
 #### Getting a single breached site in the system
 
-```golang
+```go
 import (
     "github.com/mavjs/goPwned"
     )
@@ -79,7 +79,7 @@ func main() {
 
 #### Getting all data classes in the system
 
-```golang
+```go
 import (
     "github.com/mavjs/goPwned"
     )
@@ -93,7 +93,7 @@ func main() {
 
 #### Getting all pastes for an account
 
-```golang
+```go
 import (
     "github.com/mavjs/goPwned"
     )
