@@ -103,3 +103,7 @@ func main() {
     fmt.Println(gopwned.GetAllPastesForAccount("foo@bar.com"))
 }
 ```
+
+License
+-------
+MIT
