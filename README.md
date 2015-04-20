@@ -19,7 +19,6 @@ Usage
 
 ```
 import (
-
     "github.com/mavjs/goPwned"
     )
 
@@ -32,7 +31,6 @@ func main() {
 
 ```
 import (
-
     "github.com/mavjs/goPwned"
     )
 
@@ -47,7 +45,6 @@ func main() {
 
 ```
 import (
-
     "github.com/mavjs/goPwned"
     )
 
@@ -60,7 +57,6 @@ func main() {
 
 ```
 import (
-
     "github.com/mavjs/goPwned"
     )
 
@@ -73,7 +69,6 @@ func main() {
 
 ```
 import (
-
     "github.com/mavjs/goPwned"
     )
 
@@ -86,7 +81,6 @@ func main() {
 
 ```
 import (
-
     "github.com/mavjs/goPwned"
     )
 
@@ -101,7 +95,6 @@ func main() {
 
 ```
 import (
-
     "github.com/mavjs/goPwned"
     )
 
