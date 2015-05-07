@@ -2,7 +2,7 @@ goPwned
 =======
 [![Build Status](https://travis-ci.org/mavjs/goPwned.svg?branch=master)](https://travis-ci.org/mavjs/goPwned)
 
-A golang client for HaveIBeenPwned REST API. 
+A golang library for HaveIBeenPwned REST API - 
 [https://haveibeenpwned.com/](https://haveibeenpwned.com/)
 
 Installation
