@@ -88,10 +88,15 @@ func GetAllBreachesForAccount(email, domain string) string {
 		result, statuscode = RestReq(URL)
 
 		if statuscode != "" {
-			return fmt.Sprintf("%s", statuscode)
+			return statuscode
 		}
 
 		err := json.Unmarshal(result, &jsonres)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		result, err = json.Marshal(jsonres)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -103,15 +108,20 @@ func GetAllBreachesForAccount(email, domain string) string {
 		result, statuscode = RestReq(URL)
 
 		if statuscode != "" {
-			return fmt.Sprintf("%s", statuscode)
+			return statuscode
 		}
 
 		err := json.Unmarshal(result, &jsonres)
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		result, err = json.Marshal(jsonres)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
-	return fmt.Sprintf("%+v", jsonres)
+	return fmt.Sprintf("%s", result)
 }
 
 func AllBreaches(domain string) string {
@@ -141,6 +151,11 @@ func AllBreaches(domain string) string {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		result, err = json.Marshal(jsonres)
+		if err != nil {
+			log.Fatal(err)
+		}
 	} else {
 
 		// build URL for getting details about a single breached site
@@ -156,8 +171,13 @@ func AllBreaches(domain string) string {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		result, err = json.Marshal(jsonres)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
-	return fmt.Sprintf("%+v", jsonres)
+	return fmt.Sprintf("%s", result)
 }
 
 func GetSingleBreachedSite(name string) string {
@@ -185,7 +205,12 @@ func GetSingleBreachedSite(name string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return fmt.Sprintf("%+v", jsonres)
+
+	result, err = json.Marshal(jsonres)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return fmt.Sprintf("%s", result)
 }
 
 func GetAllDataClasses() string {
@@ -213,7 +238,12 @@ func GetAllDataClasses() string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return fmt.Sprintf("%+v", jsonres)
+
+	result, err = json.Marshal(jsonres)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return fmt.Sprintf("%s", result)
 }
 
 func GetAllPastesForAccount(email string) string {
@@ -241,6 +271,10 @@ func GetAllPastesForAccount(email string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return fmt.Sprintf("%+v", jsonres)
 
+	result, err = json.Marshal(jsonres)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return fmt.Sprintf("%s", result)
 }
