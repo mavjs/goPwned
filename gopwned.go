@@ -49,7 +49,7 @@ func RestReq(url string) ([]byte, string) {
 
 	// set haveibeenpwned content negotiation header
 	req.Header.Add("Accept", "application/vnd.haveibeenpwned.v2+json")
-	req.Header.Add("User-Agent", "gopwned (HIBP golang API client library)")
+	req.Header.Add("User-Agent", "gopwned (HIBP golang API client library) - https://github.com/mavjs/goPwned")
 	// make the request
 	res, err := client.Do(req)
 	if err != nil {
