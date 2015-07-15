@@ -29,9 +29,9 @@ type jsonPasteResp struct {
 	EmailCount int
 }
 
-var BASEAPIURL = "https://haveibeenpwned.com/api/v2/%s"
+const baseURL = "https://haveibeenpwned.com/api/v2/%s"
 
-func RestReq(url string) ([]byte, string) {
+func reqURL(url string) ([]byte, string) {
 	var respcodes = map[int]string{
 		400: "Bad request — the account does not comply with an acceptable format (i.e. it's an empty string)",
 		403: "Forbidden — no user agent has been specified in the request",
@@ -72,9 +72,9 @@ func GetAllBreachesForAccount(email, domain string) string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	var (
-		URL string
-		// URL Endpoint for getting all breached sites for an account
-		URLENDPOINT = "breachedAccount/"
+		url string
+		// url Endpoint for getting all breached sites for an account
+		endpoint = "breachedAccount/"
 	)
 
 	var (
@@ -85,15 +85,15 @@ func GetAllBreachesForAccount(email, domain string) string {
 
 	if domain == "" {
 
-		// build URL for getting breaches for an account
-		URL = fmt.Sprintf(BASEAPIURL, URLENDPOINT+email)
+		// build url for getting breaches for an account
+		url = fmt.Sprintf(baseURL, endpoint+email)
 
 	} else {
 
-		// build URL for getting breaches for an account on specific domain
-		URL = fmt.Sprintf(BASEAPIURL, URLENDPOINT+email+"?domain="+domain)
+		// build url for getting breaches for an account on specific domain
+		url = fmt.Sprintf(baseURL, endpoint+email+"?domain="+domain)
 	}
-	result, statuscode = RestReq(URL)
+	result, statuscode = reqURL(url)
 
 	if statuscode != "" {
 		return statuscode
@@ -115,9 +115,9 @@ func AllBreaches(domain string) string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	var (
-		URL string
-		// URL Endpoint for getting details about all breached sites
-		URLENDPOINT = "breaches/"
+		url string
+		// url Endpoint for getting details about all breached sites
+		endpoint = "breaches/"
 	)
 
 	var (
@@ -127,15 +127,15 @@ func AllBreaches(domain string) string {
 	)
 
 	if domain == "" {
-		// build URL for getting details about all breached sites
-		URL = fmt.Sprintf(BASEAPIURL, URLENDPOINT)
+		// build url for getting details about all breached sites
+		url = fmt.Sprintf(baseURL, endpoint)
 	} else {
 
-		// build URL for getting details about a single breached site
-		URL = fmt.Sprintf(BASEAPIURL, URLENDPOINT+"?domain="+domain)
+		// build url for getting details about a single breached site
+		url = fmt.Sprintf(baseURL, endpoint+"?domain="+domain)
 	}
 
-	result, statuscode = RestReq(URL)
+	result, statuscode = reqURL(url)
 
 	if statuscode != "" {
 		return fmt.Sprintf("%s", statuscode)
@@ -156,20 +156,20 @@ func AllBreaches(domain string) string {
 func GetSingleBreachedSite(name string) string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	// URL Endpoint for getting details for a single breached site
-	URLENDPOINT := "breach/"
+	// url Endpoint for getting details for a single breached site
+	endpoint := "breach/"
 
 	var (
-		URL        string
+		url        string
 		jsonres    jsonResp
 		result     []byte
 		statuscode string
 	)
 
-	// build URL for getting details for a single breached site
-	URL = fmt.Sprintf(BASEAPIURL, URLENDPOINT+name)
+	// build url for getting details for a single breached site
+	url = fmt.Sprintf(baseURL, endpoint+name)
 
-	result, statuscode = RestReq(URL)
+	result, statuscode = reqURL(url)
 
 	if statuscode != "" {
 		return fmt.Sprintf("%s", statuscode)
@@ -190,20 +190,20 @@ func GetSingleBreachedSite(name string) string {
 func GetAllDataClasses() string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	// URL Endpoint for getting breach data classes
-	URLENDPOINT := "dataclasses/"
+	// url Endpoint for getting breach data classes
+	endpoint := "dataclasses/"
 
 	var (
-		URL        string
+		url        string
 		jsonres    interface{}
 		result     []byte
 		statuscode string
 	)
 
-	// build URL for getting breach data classes
-	URL = fmt.Sprintf(BASEAPIURL, URLENDPOINT)
+	// build url for getting breach data classes
+	url = fmt.Sprintf(baseURL, endpoint)
 
-	result, statuscode = RestReq(URL)
+	result, statuscode = reqURL(url)
 
 	if statuscode != "" {
 		return fmt.Sprintf("%s", statuscode)
@@ -224,20 +224,20 @@ func GetAllDataClasses() string {
 func GetAllPastesForAccount(email string) string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	// URL Endpoint for getting pastes for an account
-	URLENDPOINT := "pasteaccount/"
+	// url Endpoint for getting pastes for an account
+	endpoint := "pasteaccount/"
 
 	var (
-		URL        string
+		url        string
 		jsonres    []jsonPasteResp
 		result     []byte
 		statuscode string
 	)
 
-	// build URL for getting pastes for an account
-	URL = fmt.Sprintf(BASEAPIURL, URLENDPOINT+email)
+	// build url for getting pastes for an account
+	url = fmt.Sprintf(baseURL, endpoint+email)
 
-	result, statuscode = RestReq(URL)
+	result, statuscode = reqURL(url)
 
 	if statuscode != "" {
 		return fmt.Sprintf("%s", statuscode)
