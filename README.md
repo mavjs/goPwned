@@ -1,6 +1,7 @@
 goPwned
 =======
 [![Build Status](https://travis-ci.org/mavjs/goPwned.svg?branch=master)](https://travis-ci.org/mavjs/goPwned)
+[![Coverage Status](https://coveralls.io/repos/mavjs/goPwned/badge.svg?branch=master&service=github)](https://coveralls.io/github/mavjs/goPwned?branch=master)
 
 A golang library for HaveIBeenPwned REST API - 
 [https://haveibeenpwned.com/](https://haveibeenpwned.com/)
