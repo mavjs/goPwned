@@ -1,3 +1,4 @@
+// Package gopwned implements the REST api of haveibeenpwned.com for easy querying
 package gopwned
 
 import (
@@ -23,7 +24,7 @@ type jsonResp struct {
 
 type jsonPasteResp struct {
 	Source     string
-	Id         string
+	ID         string
 	Title      string
 	Date       string
 	EmailCount int
@@ -68,6 +69,7 @@ func reqURL(url string) ([]byte, string) {
 
 }
 
+// GetAllBreachesForAccount gets all the breaches associated with an account.
 func GetAllBreachesForAccount(email, domain string) string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -111,6 +113,7 @@ func GetAllBreachesForAccount(email, domain string) string {
 	return fmt.Sprintf("%s", result)
 }
 
+// AllBreaches gets all breaches associated with a domain.
 func AllBreaches(domain string) string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -153,6 +156,7 @@ func AllBreaches(domain string) string {
 	return fmt.Sprintf("%s", result)
 }
 
+// GetSingleBreachedSite gets breaches associated to a single site.
 func GetSingleBreachedSite(name string) string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -187,6 +191,7 @@ func GetSingleBreachedSite(name string) string {
 	return fmt.Sprintf("%s", result)
 }
 
+// GetAllDataClasses gets all data classes defined by the service.
 func GetAllDataClasses() string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -221,6 +226,7 @@ func GetAllDataClasses() string {
 	return fmt.Sprintf("%s", result)
 }
 
+// GetAllPastesForAccount gets all pastebins associated with an account.
 func GetAllPastesForAccount(email string) string {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
