@@ -71,7 +71,6 @@ func reqURL(url string) ([]byte, string) {
 
 // GetAllBreachesForAccount gets all the breaches associated with an account.
 func GetAllBreachesForAccount(email, domain string) string {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	var (
 		url string
@@ -115,7 +114,6 @@ func GetAllBreachesForAccount(email, domain string) string {
 
 // AllBreaches gets all breaches associated with a domain.
 func AllBreaches(domain string) string {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	var (
 		url string
@@ -158,7 +156,6 @@ func AllBreaches(domain string) string {
 
 // GetSingleBreachedSite gets breaches associated to a single site.
 func GetSingleBreachedSite(name string) string {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	// url Endpoint for getting details for a single breached site
 	endpoint := "breach/"
@@ -193,7 +190,6 @@ func GetSingleBreachedSite(name string) string {
 
 // GetAllDataClasses gets all data classes defined by the service.
 func GetAllDataClasses() string {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	// url Endpoint for getting breach data classes
 	endpoint := "dataclasses/"
@@ -228,7 +224,6 @@ func GetAllDataClasses() string {
 
 // GetAllPastesForAccount gets all pastebins associated with an account.
 func GetAllPastesForAccount(email string) string {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	// url Endpoint for getting pastes for an account
 	endpoint := "pasteaccount/"
