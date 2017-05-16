@@ -32,18 +32,19 @@ type jsonPasteResp struct {
 
 const baseURL = "https://haveibeenpwned.com/api/v2/%s"
 
-func reqURL(url string) ([]byte, string) {
-	var respcodes = map[int]string{
+var (
+	respcodes = map[int]string{
 		400: "Bad request — the account does not comply with an acceptable format (i.e. it's an empty string)",
 		403: "Forbidden — no user agent has been specified in the request",
 		404: "Not found — the account could not be found and has therefore not been pwned",
 	}
 
-	// create http client
-	client := new(http.Client)
+	client = &http.Client{}
+)
 
+func reqURL(url string) ([]byte, string) {
 	// request http api
-	req, err := http.NewRequest("Get", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
