@@ -2,75 +2,143 @@
 package gopwned
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
+	"time"
 )
 
-type jsonResp struct {
-	Title       string
-	Name        string
-	Domain      string
-	BreachDate  string
-	AddedDate   string
-	PwnCount    int
-	Description string
-	DataClasses []string
-	IsVerified  bool
-	LogoType    string
+const (
+	libVersion     = "0.1"
+	defaultBaseURL = "https://haveibeenpwned.com/api/v2/"
+	userAgent      = "gopwned-api-client-" + libVersion
+	mediaTypeV2    = "application/vnd.haveibeenpwned.v2+json"
+)
+
+type response struct {
+	strResp    string
+	statuscode string
 }
 
-type jsonPasteResp struct {
+func (r *response) Resp() string {
+	if r.statuscode == "" {
+		return r.strResp
+	}
+
+	return r.statuscode
+}
+
+// A Client manages communication with the HaveIBeenPwned API
+type Client struct {
+	client    *http.Client
+	baseURL   *url.URL
+	userAgent string
+	respCodes map[int]string
+}
+
+type breachModel struct {
+	Name         string
+	Title        string
+	Domain       string
+	BreachDate   string
+	AddedDate    string
+	PwnCount     int
+	Description  string
+	DataClasses  []string
+	IsVerified   bool
+	IsFabricated bool
+	IsSensitive  bool
+	IsRetired    bool
+	IsSpamList   bool
+	LogoType     string
+}
+
+type pasteModel struct {
 	Source     string
 	ID         string
 	Title      string
-	Date       string
+	Date       time.Time
 	EmailCount int
 }
 
-const baseURL = "https://haveibeenpwned.com/api/v2/%s"
-
-func reqURL(url string) ([]byte, string) {
-	var respcodes = map[int]string{
+// NewClient returns a new HaveIBeenPwned API client.
+func NewClient(httpClient *http.Client) (*Client, error) {
+	var respCodes = map[int]string{
 		400: "Bad request — the account does not comply with an acceptable format (i.e. it's an empty string)",
 		403: "Forbidden — no user agent has been specified in the request",
 		404: "Not found — the account could not be found and has therefore not been pwned",
+		429: "Too many requests — the rate limit has been exceeded",
 	}
 
-	// create http client
-	client := new(http.Client)
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
 
-	// request http api
-	req, err := http.NewRequest("Get", url, nil)
+	baseURL, err := url.Parse(defaultBaseURL)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	// set haveibeenpwned content negotiation header
-	req.Header.Add("Accept", "application/vnd.haveibeenpwned.v2+json")
-	req.Header.Add("User-Agent", "gopwned (HIBP golang API client library) - https://github.com/mavjs/goPwned")
-	// make the request
-	res, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// read body
-	body, err := ioutil.ReadAll(res.Body)
-	defer res.Body.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	statuscode := respcodes[res.StatusCode]
-	return body, statuscode
-
+	client := &Client{client: httpClient, baseURL: baseURL, userAgent: userAgent, respCodes: respCodes}
+	return client, nil
 }
 
+// NewRequest creates an API request.
+func (c *Client) reqURL(endpoint, params string, opts url.Values, jsonresp interface{}) (*response, error) {
+
+	u, err := c.baseURL.Parse(endpoint + params)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", u.String(), bytes.NewBufferString(opts.Encode()))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Accept", mediaTypeV2)
+	if c.userAgent != "" {
+		req.Header.Set("User-Agent", c.userAgent)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&jsonresp)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := json.MarshalIndent(jsonresp, "", " ")
+	if err != nil {
+		return nil, err
+	}
+	result := &response{
+		strResp:    string(b),
+		statuscode: c.respCodes[resp.StatusCode],
+	}
+
+	return result, nil
+}
+
+// Do makes the HTTP Request and returns a HTTP Response.
+//func (c *Client) Do(req *http.Request) (*http.Response, error) {
+//}
+
 // GetAllBreachesForAccount gets all the breaches associated with an account.
-func GetAllBreachesForAccount(email, domain string) string {
+func (c *Client) GetAllBreachesForAccount(email, domain string) string {
 
 	var (
 		url string
