@@ -4,9 +4,6 @@ package gopwned
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -40,21 +37,21 @@ type Client struct {
 	respCodes map[int]string
 }
 
-type breachModel struct {
-	Name         string
-	Title        string
-	Domain       string
-	BreachDate   string
-	AddedDate    string
-	PwnCount     int
-	Description  string
-	DataClasses  []string
-	IsVerified   bool
-	IsFabricated bool
-	IsSensitive  bool
-	IsRetired    bool
-	IsSpamList   bool
-	LogoType     string
+type BreachModel struct {
+	Name         string   `json:"Name,omitempty"`
+	Title        string   `json:"Title,omitempty"`
+	Domain       string   `json:"Domain,omitempty"`
+	BreachDate   string   `json:"BreachDate,omitempty"`
+	AddedDate    string   `json:"AddedDate,omitempty"`
+	PwnCount     int      `json:"PwnCount,omitempty"`
+	Description  string   `json:"Description,omitempty"`
+	DataClasses  []string `json:"DataClasses,omitempty"`
+	IsVerified   bool     `json:"IsVerified,omitempty"`
+	IsFabricated bool     `json:"IsFabricated,omitempty"`
+	IsSensitive  bool     `json:"IsSensitive,omitempty"`
+	IsRetired    bool     `json:"IsRetired,omitempty"`
+	IsSpamList   bool     `json:"IsSpamList,omitempty"`
+	LogoType     string   `json:"LogoType,omitempty"`
 }
 
 type pasteModel struct {
@@ -88,7 +85,7 @@ func NewClient(httpClient *http.Client) (*Client, error) {
 }
 
 // NewRequest creates an API request.
-func (c *Client) reqURL(endpoint, params string, opts url.Values, jsonresp interface{}) (*response, error) {
+func (c *Client) reqURL(endpoint, params string, opts url.Values) (*http.Request, error) {
 
 	u, err := c.baseURL.Parse(endpoint + params)
 	if err != nil {
@@ -105,221 +102,62 @@ func (c *Client) reqURL(endpoint, params string, opts url.Values, jsonresp inter
 		req.Header.Set("User-Agent", c.userAgent)
 	}
 
+	return req, nil
+}
+
+func (c *Client) reqDo(req *http.Request) (*http.Response, error) {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&jsonresp)
-	if err != nil {
-		return nil, err
-	}
-
-	b, err := json.MarshalIndent(jsonresp, "", " ")
-	if err != nil {
-		return nil, err
-	}
-	result := &response{
-		strResp:    string(b),
-		statuscode: c.respCodes[resp.StatusCode],
-	}
-
-	return result, nil
+	return resp, nil
 }
-
-// Do makes the HTTP Request and returns a HTTP Response.
-//func (c *Client) Do(req *http.Request) (*http.Response, error) {
-//}
 
 // GetAllBreachesForAccount gets all the breaches associated with an account.
-func (c *Client) GetAllBreachesForAccount(email, domain string) string {
+func (c *Client) GetAllBreachesForAccount(email, domain, truncateResponse string) ([]*BreachModel, error) {
 
 	var (
-		url string
 		// url Endpoint for getting all breached sites for an account
-		endpoint = "breachedAccount/"
+		endpoint = "breachedaccount/"
+		opts     = url.Values{}
+		jsonResp []*BreachModel
 	)
 
-	var (
-		jsonres    []jsonResp
-		result     []byte
-		statuscode string
-	)
-
-	if domain == "" {
-
-		// build url for getting breaches for an account
-		url = fmt.Sprintf(baseURL, endpoint+email)
-
-	} else {
-
-		// build url for getting breaches for an account on specific domain
-		url = fmt.Sprintf(baseURL, endpoint+email+"?domain="+domain)
-	}
-	result, statuscode = reqURL(url)
-
-	if statuscode != "" {
-		return statuscode
+	if domain != "" {
+		opts.Set("domain", domain)
 	}
 
-	err := json.Unmarshal(result, &jsonres)
+	if truncateResponse != "" {
+		opts.Set("truncateResponse", truncateResponse)
+	}
+
+	req, err := c.reqURL(endpoint, email, opts)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	result, err = json.Marshal(jsonres)
+	resp, err := c.reqDo(req)
 	if err != nil {
-		log.Fatal(err)
-	}
-	return fmt.Sprintf("%s", result)
-}
-
-// AllBreaches gets all breaches associated with a domain.
-func AllBreaches(domain string) string {
-
-	var (
-		url string
-		// url Endpoint for getting details about all breached sites
-		endpoint = "breaches/"
-	)
-
-	var (
-		jsonres    []jsonResp
-		result     []byte
-		statuscode string
-	)
-
-	if domain == "" {
-		// build url for getting details about all breached sites
-		url = fmt.Sprintf(baseURL, endpoint)
-	} else {
-
-		// build url for getting details about a single breached site
-		url = fmt.Sprintf(baseURL, endpoint+"?domain="+domain)
+		return nil, err
 	}
 
-	result, statuscode = reqURL(url)
-
-	if statuscode != "" {
-		return fmt.Sprintf("%s", statuscode)
-	}
-
-	err := json.Unmarshal(result, &jsonres)
+	err = json.NewDecoder(resp.Body).Decode(&jsonResp)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
-	result, err = json.Marshal(jsonres)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return fmt.Sprintf("%s", result)
-}
-
-// GetSingleBreachedSite gets breaches associated to a single site.
-func GetSingleBreachedSite(name string) string {
-
-	// url Endpoint for getting details for a single breached site
-	endpoint := "breach/"
-
-	var (
-		url        string
-		jsonres    jsonResp
-		result     []byte
-		statuscode string
-	)
-
-	// build url for getting details for a single breached site
-	url = fmt.Sprintf(baseURL, endpoint+name)
-
-	result, statuscode = reqURL(url)
-
-	if statuscode != "" {
-		return fmt.Sprintf("%s", statuscode)
-	}
-
-	err := json.Unmarshal(result, &jsonres)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	result, err = json.Marshal(jsonres)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return fmt.Sprintf("%s", result)
-}
-
-// GetAllDataClasses gets all data classes defined by the service.
-func GetAllDataClasses() string {
-
-	// url Endpoint for getting breach data classes
-	endpoint := "dataclasses/"
-
-	var (
-		url        string
-		jsonres    interface{}
-		result     []byte
-		statuscode string
-	)
-
-	// build url for getting breach data classes
-	url = fmt.Sprintf(baseURL, endpoint)
-
-	result, statuscode = reqURL(url)
-
-	if statuscode != "" {
-		return fmt.Sprintf("%s", statuscode)
-	}
-
-	err := json.Unmarshal(result, &jsonres)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	result, err = json.Marshal(jsonres)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return fmt.Sprintf("%s", result)
-}
-
-// GetAllPastesForAccount gets all pastebins associated with an account.
-func GetAllPastesForAccount(email string) string {
-
-	// url Endpoint for getting pastes for an account
-	endpoint := "pasteaccount/"
-
-	var (
-		url        string
-		jsonres    []jsonPasteResp
-		result     []byte
-		statuscode string
-	)
-
-	// build url for getting pastes for an account
-	url = fmt.Sprintf(baseURL, endpoint+email)
-
-	result, statuscode = reqURL(url)
-
-	if statuscode != "" {
-		return fmt.Sprintf("%s", statuscode)
-	}
-
-	err := json.Unmarshal(result, &jsonres)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	result, err = json.Marshal(jsonres)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return fmt.Sprintf("%s", result)
+	//
+	//	b, err := json.MarshalIndent(&jsonResp, "", " ")
+	//	if err != nil {
+	//		return "", err
+	//	}
+	//
+	//	result := &response{
+	//		strResp:    string(b),
+	//		statuscode: c.respCodes[resp.StatusCode],
+	//	}
+	//
+	//	finalResult := result.Resp()
+	//
+	//	return finalResult, nil
+	return jsonResp, nil
 }
