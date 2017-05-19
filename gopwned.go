@@ -4,9 +4,9 @@ package gopwned
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 )
 
 const (
@@ -54,12 +54,12 @@ type BreachModel struct {
 	LogoType     string   `json:"LogoType,omitempty"`
 }
 
-type pasteModel struct {
-	Source     string
-	ID         string
-	Title      string
-	Date       time.Time
-	EmailCount int
+type PasteModel struct {
+	Source     string `json:"Source,omitempty"`
+	ID         string `json:"Id,omitempty"`
+	Title      string `json:"Title,omitempty"`
+	Date       string `json:"Date,omitempty"`
+	EmailCount int    `json:"EmailCount,omitempty"`
 }
 
 // NewClient returns a new HaveIBeenPwned API client.
@@ -145,19 +145,113 @@ func (c *Client) GetAllBreachesForAccount(email, domain, truncateResponse string
 	if err != nil {
 		return nil, err
 	}
-	//
-	//	b, err := json.MarshalIndent(&jsonResp, "", " ")
-	//	if err != nil {
-	//		return "", err
-	//	}
-	//
-	//	result := &response{
-	//		strResp:    string(b),
-	//		statuscode: c.respCodes[resp.StatusCode],
-	//	}
-	//
-	//	finalResult := result.Resp()
-	//
-	//	return finalResult, nil
+	return jsonResp, nil
+}
+
+// GetAllBreachedSites gets all the breached sites.
+func (c *Client) GetAllBreachedSites(domain string) ([]*BreachModel, error) {
+	var (
+		endpoint = "breaches"
+		opts     = url.Values{}
+		jsonResp []*BreachModel
+	)
+
+	if domain != "" {
+		opts.Set("domain", domain)
+	}
+
+	req, err := c.reqURL(endpoint, "", opts)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.reqDo(req)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&jsonResp)
+	if err != nil {
+		return nil, err
+	}
+	return jsonResp, nil
+}
+
+// GetBreachedSite gets details about one breached site.
+func (c *Client) GetBreachedSite(siteName string) ([]*BreachModel, error) {
+	var (
+		endpoint = "breach/"
+		jsonResp []*BreachModel
+	)
+
+	if siteName == "" {
+		return nil, fmt.Errorf("this method require a name of the breached site")
+	}
+
+	req, err := c.reqURL(endpoint, siteName, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.reqDo(req)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&jsonResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return jsonResp, nil
+}
+
+// GetDataClasses get all data classes defined in the API.
+func (c *Client) GetDataClasses() ([]*BreachModel, error) {
+	var (
+		endpoint = "dataclasses"
+		jsonResp []*BreachModel
+	)
+
+	req, err := c.reqURL(endpoint, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.reqDo(req)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&jsonResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return jsonResp, nil
+}
+
+// GetAllPastesForAccount get all paste services associated with an account.
+func (c *Client) GetAllPastesForAccount(account string) ([]*PasteModel, error) {
+	var (
+		endpoint = "pasteaccount/"
+		jsonResp []*PasteModel
+	)
+
+	req, err := c.reqURL(endpoint, account, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.reqDo(req)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&jsonResp)
+	if err != nil {
+		return nil, err
+	}
+
 	return jsonResp, nil
 }
