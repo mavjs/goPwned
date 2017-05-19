@@ -62,6 +62,8 @@ type PasteModel struct {
 	EmailCount int    `json:"EmailCount,omitempty"`
 }
 
+type DataClasses []string
+
 // NewClient returns a new HaveIBeenPwned API client.
 func NewClient(httpClient *http.Client) (*Client, error) {
 	var respCodes = map[int]string{
@@ -207,10 +209,10 @@ func (c *Client) GetBreachedSite(siteName string) ([]*BreachModel, error) {
 }
 
 // GetDataClasses get all data classes defined in the API.
-func (c *Client) GetDataClasses() ([]*BreachModel, error) {
+func (c *Client) GetDataClasses() (*DataClasses, error) {
 	var (
 		endpoint = "dataclasses"
-		jsonResp []*BreachModel
+		jsonResp *DataClasses
 	)
 
 	req, err := c.reqURL(endpoint, "", nil)
