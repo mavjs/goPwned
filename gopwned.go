@@ -4,159 +4,176 @@ package gopwned
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 )
 
-// not used for now
-// XXX check for possible API change
-// type jsonResp struct {
-// 	Title       string
-// 	Name        string
-// 	Domain      string
-// 	BreachDate  string
-// 	AddedDate   string
-// 	PwnCount    int
-// 	Description string
-// 	DataClasses []string
-// 	IsVerified  bool
-// 	LogoType    string
-// }
+type (
+	Client struct {
+		client    *http.Client
+		UserAgent string
+	}
 
-// type jsonPasteResp struct {
-// 	Source     string
-// 	ID         string
-// 	Title      string
-// 	Date       string
-// 	EmailCount int
-// }
+	Breach struct {
+		Name         string       `json:"Name,omitempty"`
+		Title        string       `json:"Title,omitempty"`
+		Domain       string       `json:"Domain,omitempty"`
+		BreachDate   string       `json:"BreachDate,omitempty"`
+		AddedDate    string       `json:"AddedDate,omitempty"`
+		PwnCount     int          `json:"PwnCount,omitempty"`
+		Description  string       `json:"Description,omitempty"`
+		DataClasses  *DataClasses `json:"DataClasses,omitempty"`
+		IsVerified   bool         `json:"IsVerified,omitempty"`
+		IsFabricated bool         `json:"IsFabricated,omitempty"`
+		IsSensitive  bool         `json:"IsSensitive,omitempty"`
+		IsRetired    bool         `json:"IsRetired,omitempty"`
+		IsSpamList   bool         `json:"IsSpamList,omitempty"`
+		LogoType     string       `json:"LogoType,omitempty"`
+	}
 
-const baseURL = "https://haveibeenpwned.com/api/v2/%s"
+	Paste struct {
+		Source     string `json:"Source,omitempty"`
+		ID         string `json:"Id,omitempty"`
+		Title      string `json:"Title,omitempty"`
+		Date       string `json:"Date,omitempty"`
+		EmailCount int    `json:"EmailCount,omitempty"`
+	}
+
+	DataClasses []string
+)
+
+const (
+	Version     = "0.1"
+	UserAgent   = "gopwned-api-client-" + Version
+	MediaTypeV2 = "application/vnd.haveibeenpwned.v2+json"
+	Endpoint    = "https://haveibeenpwned.com/api/v2/"
+)
 
 var (
 	respcodes = map[int]string{
 		400: "Bad request — the account does not comply with an acceptable format (i.e. it's an empty string)",
 		403: "Forbidden — no user agent has been specified in the request",
 		404: "Not found — the account could not be found and has therefore not been pwned",
-		429: "Not found — the account could not be found and has therefore not been pwned",
+		429: "Too many requests — the rate limit has been exceeded",
 	}
 
-	client = &http.Client{}
+	defaultClient, _ = NewClient(nil)
+	baseURL, _       = url.Parse(Endpoint)
 )
 
-func reqURL(target string) (string, error) {
-	// request http api
+func NewClient(client *http.Client) (*Client, error) {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	return &Client{client: client, UserAgent: UserAgent}, nil
+}
+
+func (c *Client) do(resource string, opts url.Values) (*http.Response, error) {
+	u, err := baseURL.Parse(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	target := u.String()
+	if opts != nil {
+		target = fmt.Sprintf("%s?%s", target, opts.Encode())
+	}
+
 	req, err := http.NewRequest("GET", target, nil)
-	if err != nil {
-		return "", err
-	}
+	req.Header.Set("Accept", MediaTypeV2)
+	req.Header.Set("User-Agent", c.UserAgent)
+	req.Close = true
 
-	// set haveibeenpwned content negotiation header
-	req.Header.Add("Accept", "application/vnd.haveibeenpwned.v2+json")
-	req.Header.Add("User-Agent", "gopwned (HIBP golang API client library) - https://github.com/mavjs/goPwned")
-	// make the request
-	res, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-
-	statuscode := respcodes[res.StatusCode]
-	if statuscode != "" {
-		return statuscode, nil
-	}
-
-	// Because Mav likes it
-	var jsonres interface{}
-	err = json.NewDecoder(res.Body).Decode(&jsonres)
-	if err != nil {
-		return "", err
-	}
-
-	// Pretty print for Mav
-	b, err := json.MarshalIndent(jsonres, "", "  ")
-	return string(b), err
-
-	// For direct response
-	// body, err := ioutil.ReadAll(res.Body)
-	// return string(body), err
+	return c.client.Do(req)
 }
 
-func fetch(endpoint string, param url.Values) (string, error) {
-	target := fmt.Sprintf(baseURL, endpoint)
-	if param != nil {
-		target = fmt.Sprintf("%s?%s", target, param.Encode())
+func (c *Client) getBreaches(resource string, opts url.Values) ([]*Breach, error) {
+	resp, err := c.do(resource, opts)
+	if err != nil {
+		return nil, err
 	}
-	return reqURL(target)
+	defer resp.Body.Close()
+
+	var breaches []*Breach
+	err = json.NewDecoder(resp.Body).Decode(&breaches)
+	return breaches, err
 }
 
-// GetAllBreachesForAccount gets all the breaches associated with an account.
-func GetAllBreachesForAccount(email, domain string) string {
-	endpoint := fmt.Sprintf("breachedAccount/%s", email)
+func (c *Client) GetAllBreachesForAccount(email, domain, truncateResponse string) ([]*Breach, error) {
+	resource := fmt.Sprintf("breachedaccount/%s", email)
 
-	var params url.Values
+	opts := url.Values{}
 	if domain != "" {
-		params = url.Values{}
-		params.Set("domain", domain)
+		opts.Set("domain", domain)
 	}
 
-	// XXX should return (string, error) but it'll break API, temporary fix
-	// Should panic when this occurs
-	result, err := fetch(endpoint, params)
-	if err != nil {
-		log.Fatal(err)
+	if truncateResponse != "" {
+		opts.Set("truncateResponse", truncateResponse)
 	}
-	return result
+
+	return c.getBreaches(resource, opts)
 }
 
-// AllBreaches gets all breaches associated with a domain.
-func AllBreaches(domain string) string {
-	// url Endpoint for getting details about all breached sites
-	endpoint := "breaches/"
+func (c *Client) GetAllBreachedSites(domain string) ([]*Breach, error) {
+	resource := "breaches"
 
-	var params url.Values
+	opts := url.Values{}
 	if domain != "" {
-		params = url.Values{}
-		params.Set("domain", domain)
+		opts.Set("domain", domain)
 	}
 
-	result, err := fetch(endpoint, params)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return result
+	return c.getBreaches(resource, opts)
 }
 
-// GetSingleBreachedSite gets breaches associated to a single site.
-func GetSingleBreachedSite(name string) string {
-	// url Endpoint for getting details for a single breached site
-	endpoint := fmt.Sprintf("breach/%s", name)
-	result, err := fetch(endpoint, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return result
+func (c *Client) GetBreachedSite(site string) ([]*Breach, error) {
+	resource := fmt.Sprintf("breach/%s", site)
+	return c.getBreaches(resource, nil)
 }
 
-// GetAllDataClasses gets all data classes defined by the service.
-func GetAllDataClasses() string {
-	// url Endpoint for getting breach data classes
-	endpoint := "dataclasses/"
-	result, err := fetch(endpoint, nil)
+func (c *Client) GetDataClasses() (*DataClasses, error) {
+	resource := "dataclasses"
+
+	resp, err := c.do(resource, nil)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return result
+	defer resp.Body.Close()
+
+	var dataclasses *DataClasses
+	err = json.NewDecoder(resp.Body).Decode(&dataclasses)
+	return dataclasses, err
 }
 
-// GetAllPastesForAccount gets all pastebins associated with an account.
-func GetAllPastesForAccount(email string) string {
-	// url Endpoint for getting pastes for an account
-	endpoint := fmt.Sprintf("pasteaccount/%s", email)
-	result, err := fetch(endpoint, nil)
+func (c *Client) GetAllPastesForAccount(account string) ([]*Paste, error) {
+	resource := fmt.Sprintf("pasteaccount/%s", account)
+
+	resp, err := c.do(resource, nil)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return result
+	defer resp.Body.Close()
+
+	var pastes []*Paste
+	err = json.NewDecoder(resp.Body).Decode(&pastes)
+	return pastes, err
+}
+
+func GetAllBreachesForAccount(email, domain, truncateResponse string) ([]*Breach, error) {
+	return defaultClient.GetAllBreachesForAccount(email, domain, truncateResponse)
+}
+
+func GetAllBreachedSites(domain string) ([]*Breach, error) {
+	return defaultClient.GetAllBreachedSites(domain)
+}
+
+func GetBreachedSite(site string) ([]*Breach, error) {
+	return defaultClient.GetBreachedSite(site)
+}
+
+func GetDataClasses() (*DataClasses, error) {
+	return defaultClient.GetDataClasses()
+}
+
+func GetAllPastesForAccount(account string) ([]*Paste, error) {
+	return defaultClient.GetAllPastesForAccount(account)
 }
