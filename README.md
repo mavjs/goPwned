@@ -1,5 +1,7 @@
 goPwned
 =======
+[![Go Report Card](https://goreportcard.com/badge/github.com/mavjs/goPwned)](https://goreportcard.com/report/github.com/mavjs/goPwned)
+[![GoDoc](https://godoc.org/github.com/mavjs/goPwned?status.svg)](https://godoc.org/github.com/mavjs/goPwned)
 [![Build Status](https://travis-ci.org/mavjs/goPwned.svg?branch=master)](https://travis-ci.org/mavjs/goPwned)
 [![Coverage Status](https://coveralls.io/repos/mavjs/goPwned/badge.svg?branch=master&service=github)](https://coveralls.io/github/mavjs/goPwned?branch=master)
 
