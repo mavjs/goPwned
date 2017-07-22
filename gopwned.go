@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+    "github.com/badoux/checkmail"
 )
 
 type (
@@ -100,6 +101,11 @@ func (c *Client) getBreaches(resource string, opts url.Values) ([]*Breach, error
 }
 
 func (c *Client) GetAllBreachesForAccount(email, domain, truncateResponse string) ([]*Breach, error) {
+    err := checkmail.ValidateFormat(email)
+    if err != nil {
+            fmt.Println("Invalid Mail Format")
+            return nil, err
+    }
 	resource := fmt.Sprintf("breachedaccount/%s", email)
 
 	opts := url.Values{}
