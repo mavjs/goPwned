@@ -11,7 +11,7 @@ A golang library for HaveIBeenPwned REST API -
 Installation
 ------------
 
-```go get https://github.com/mavjs/goPwned```
+```go get github.com/mavjs/goPwned```
 
 Usage
 -----
