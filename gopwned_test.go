@@ -26,7 +26,10 @@ func init() {
 	mockServer = httptest.NewServer(mockHandler)
 
 	// overwrite the package's default
-	baseURL, _ = url.Parse(mockServer.URL)
+	localURL, _ := url.Parse(mockServer.URL)
+
+	defaultClient.BaseURL = localURL
+	defaultClient.PwnPwdURL = localURL
 }
 
 func checkHeader(t *testing.T) http.HandlerFunc {
@@ -41,6 +44,22 @@ func checkHeader(t *testing.T) http.HandlerFunc {
 				t.Fatalf("Expected %s for request header, got %s", v, header)
 			}
 		}
+	}
+}
+
+func TestNewClient(t *testing.T) {
+	c := NewClient(nil)
+
+	if got, want := c.BaseURL.String(), Endpoint; got != want {
+		t.Errorf("NewClient BaseURL is %v, want %v", got, want)
+	}
+
+	if got, want := c.PwnPwdURL.String(), PwnPwdEndpoint; got != want {
+		t.Errorf("NewClient PwnPwdURL is %v, want %v", got, want)
+	}
+
+	if got, want := c.UserAgent, UserAgent; got != want {
+		t.Errorf("NewClient UserAgent is %v, want %v", got, want)
 	}
 }
 
@@ -150,4 +169,21 @@ func TestGetAllPastesForAccount(t *testing.T) {
 		},
 	}
 	assert.Equal(want, account, "they should be the same output.")
+}
+
+func TestPwnedPasswords(t *testing.T) {
+	assert := assert.New(t)
+
+	want := "2D8D1B3FAACCA6A3C6A91617B2FA32E2F57:1\n2DC183F740EE76F27B78EB39C8AD972A757:49938"
+
+	mockHandler.HandleFunc("/21BD1", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "2D8D1B3FAACCA6A3C6A91617B2FA32E2F57:1\n2DC183F740EE76F27B78EB39C8AD972A757:49938")
+	})
+
+	pwds, err := PwnedPasswords("21BD1")
+	if err != nil {
+		t.Errorf("[PwnedPasswords] returned error: %v", err)
+	}
+
+	assert.Equal(want, string(pwds), "they should be the same output.")
 }

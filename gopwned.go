@@ -4,6 +4,7 @@ package gopwned
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 )
@@ -12,6 +13,8 @@ type (
 	Client struct {
 		client    *http.Client
 		UserAgent string
+		BaseURL   *url.URL
+		PwnPwdURL *url.URL
 	}
 
 	Breach struct {
@@ -43,10 +46,11 @@ type (
 )
 
 const (
-	Version     = "0.1"
-	UserAgent   = "gopwned-api-client-" + Version
-	MediaTypeV2 = "application/vnd.haveibeenpwned.v2+json"
-	Endpoint    = "https://haveibeenpwned.com/api/v2/"
+	Version        = "0.1"
+	UserAgent      = "gopwned-api-client-" + Version
+	MediaTypeV2    = "application/vnd.haveibeenpwned.v2+json"
+	Endpoint       = "https://haveibeenpwned.com/api/v2/"
+	PwnPwdEndpoint = "https://api.pwnedpasswords.com/range/"
 )
 
 var (
@@ -57,19 +61,20 @@ var (
 		429: "Too many requests — the rate limit has been exceeded",
 	}
 
-	defaultClient, _ = NewClient(nil)
-	baseURL, _       = url.Parse(Endpoint)
+	defaultClient = NewClient(nil)
+	baseURL, _    = url.Parse(Endpoint)
+	pwnpwdURL, _  = url.Parse(PwnPwdEndpoint)
 )
 
-func NewClient(client *http.Client) (*Client, error) {
+func NewClient(client *http.Client) *Client {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	return &Client{client: client, UserAgent: UserAgent}, nil
+	return &Client{client: client, UserAgent: UserAgent, BaseURL: baseURL, PwnPwdURL: pwnpwdURL}
 }
 
-func (c *Client) do(resource string, opts url.Values) (*http.Response, error) {
-	u, err := baseURL.Parse(resource)
+func (c *Client) newRequest(resource string, opts url.Values) (*http.Response, error) {
+	u, err := c.BaseURL.Parse(resource)
 	if err != nil {
 		return nil, err
 	}
@@ -80,15 +85,44 @@ func (c *Client) do(resource string, opts url.Values) (*http.Response, error) {
 	}
 
 	req, err := http.NewRequest("GET", target, nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Accept", MediaTypeV2)
 	req.Header.Set("User-Agent", c.UserAgent)
 	req.Close = true
 
-	return c.client.Do(req)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (c *Client) newPwdRequest(resource string, opts url.Values) (*http.Response, error) {
+	target, err := c.PwnPwdURL.Parse(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", target.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", c.UserAgent)
+	req.Close = true
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func (c *Client) getBreaches(resource string, opts url.Values) ([]*Breach, error) {
-	resp, err := c.do(resource, opts)
+	resp, err := c.newRequest(resource, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +167,7 @@ func (c *Client) GetBreachedSite(site string) ([]*Breach, error) {
 func (c *Client) GetDataClasses() (*DataClasses, error) {
 	resource := "dataclasses"
 
-	resp, err := c.do(resource, nil)
+	resp, err := c.newRequest(resource, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +181,7 @@ func (c *Client) GetDataClasses() (*DataClasses, error) {
 func (c *Client) GetAllPastesForAccount(account string) ([]*Paste, error) {
 	resource := fmt.Sprintf("pasteaccount/%s", account)
 
-	resp, err := c.do(resource, nil)
+	resp, err := c.newRequest(resource, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +190,21 @@ func (c *Client) GetAllPastesForAccount(account string) ([]*Paste, error) {
 	var pastes []*Paste
 	err = json.NewDecoder(resp.Body).Decode(&pastes)
 	return pastes, err
+}
+
+func (c *Client) PwnedPasswords(chars string) ([]byte, error) {
+	resp, err := c.newPwdRequest(chars, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return respBody, nil
 }
 
 func GetAllBreachesForAccount(email, domain, truncateResponse string) ([]*Breach, error) {
@@ -176,4 +225,8 @@ func GetDataClasses() (*DataClasses, error) {
 
 func GetAllPastesForAccount(account string) ([]*Paste, error) {
 	return defaultClient.GetAllPastesForAccount(account)
+}
+
+func PwnedPasswords(chars string) ([]byte, error) {
+	return defaultClient.PwnedPasswords(chars)
 }
