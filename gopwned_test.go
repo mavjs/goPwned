@@ -1,189 +1,179 @@
 package gopwned
 
 import (
-	"net/http"
-	"net/http/httptest"
-	"net/url"
+	"encoding/json"
+	"errors"
 	"testing"
-
-	"fmt"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	expectedMethod  = "GET"
-	expectedHeaders = map[string]string{
-		"Accept": MediaTypeV2,
-	}
-
-	mockHandler *http.ServeMux
-	mockServer  *httptest.Server
-)
-
-func init() {
-	mockHandler = http.NewServeMux()
-	mockServer = httptest.NewServer(mockHandler)
-
-	// overwrite the package's default
-	localURL, _ := url.Parse(mockServer.URL)
-
-	defaultClient.BaseURL = localURL
-	defaultClient.PwnPwdURL = localURL
-}
-
-func checkHeader(t *testing.T) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != expectedMethod {
-			t.Fatalf("Expected %s for request method, got %s", expectedMethod, r.Method)
-		}
-
-		for k, v := range expectedHeaders {
-			header := r.Header.Get(k)
-			if header != v {
-				t.Fatalf("Expected %s for request header, got %s", v, header)
-			}
-		}
-	}
-}
-
-func TestNewClient(t *testing.T) {
-	c := NewClient(nil)
-
-	if got, want := c.BaseURL.String(), Endpoint; got != want {
-		t.Errorf("NewClient BaseURL is %v, want %v", got, want)
-	}
-
-	if got, want := c.PwnPwdURL.String(), PwnPwdEndpoint; got != want {
-		t.Errorf("NewClient PwnPwdURL is %v, want %v", got, want)
-	}
-
-	if got, want := c.UserAgent, UserAgent; got != want {
-		t.Errorf("NewClient UserAgent is %v, want %v", got, want)
-	}
-}
-
-// XXX Test for *Client
-
-func TestAllBreachesForAccount(t *testing.T) {
+func TestUnAuthReq(t *testing.T) {
 	assert := assert.New(t)
 
-	mockHandler.HandleFunc("/breachedaccount/test@example.com", func(w http.ResponseWriter, r *http.Request) {
-		checkHeader(t)(w, r)
-		fmt.Fprint(w, `[{"Name":"000webhost"},{"Name": "Adobe"}]`)
-	})
+	want_result := []*Breach([]*Breach(nil))
+	want_error := errors.New("the function you're trying to request requires an API key")
 
-	account, err := GetAllBreachesForAccount("test@example.com", "", "")
+	gopwn := NewClient(nil, "")
+	got_result, got_err := gopwn.GetAllBreaches("multiple-breaches@hibp-integration-tests.com", "", true, false)
+	if got_err != nil {
+		assert.Equal(want_error, got_err, "[Error Test] The test expected a failure in authentication due to missing API key.")
+	}
+	assert.Equal(want_result, got_result, "[Return Test] The test expected a failure in authentication due to missing API key.")
+}
+
+func TestUnAuthzAPI(t *testing.T) {
+	assert := assert.New(t)
+
+	want_error := errors.New(respCodes[401])
+
+	gopwn := NewClient(nil, "InvalidAPIKey")
+	_, got_err := gopwn.GetAllBreaches("account-exists@hibp-integration-tests.com", "", true, false)
+	if got_err != nil {
+		assert.Equal(want_error, got_err, "The test expected to return a message based on HTTP Status Code 401.")
+	}
+}
+
+func TestBreachesStruct(t *testing.T) {
+	assert := assert.New(t)
+
+	breach_struct := []*Breach{}
+
+	raw_breaches := `
+	[
+	{
+	"Name":"Adobe",
+	"Title":"Adobe",
+	"Domain":"adobe.com",
+	"BreachDate":"2013-10-04",
+	"AddedDate":"2013-12-04T00:00Z",
+	"ModifiedDate":"2013-12-04T00:00Z",
+	"PwnCount":152445165,
+	"Description":"In October 2013, 153 million Adobe accounts were breached with each containing an internal ID, username, email, <em>encrypted</em> password and a password hint in plain text. The password cryptography was poorly done and <a href=\"http://stricture-group.com/files/adobe-top100.txt\" target=\"_blank\" rel=\"noopener\">many were quickly resolved back to plain text</a>. The unencrypted hints also <a href=\"http://www.troyhunt.com/2013/11/adobe-credentials-and-serious.html\" target=\"_blank\" rel=\"noopener\">disclosed much about the passwords</a> adding further to the risk that hundreds of millions of Adobe customers already faced.",
+	"DataClasses":["Email addresses","Password hints","Passwords","Usernames"],
+	"IsVerified":true,
+	"IsFabricated":false,
+	"IsSensitive":false,
+	"IsRetired":false,
+	"IsSpamList":false,
+	"LogoPath":"https://haveibeenpwned.com/Content/Images/PwnedLogos/Adobe.png"
+	},
+	{
+	"Name":"BattlefieldHeroes",
+	"Title":"Battlefield Heroes",
+	"Domain":"battlefieldheroes.com",
+	"BreachDate":"2011-06-26",
+	"AddedDate":"2014-01-23T13:10Z",
+	"ModifiedDate":"2014-01-23T13:10Z",
+	"PwnCount":530270,
+	"Description":"In June 2011 as part of a final breached data dump, the hacker collective &quot;LulzSec&quot; <a href=\"http://www.rockpapershotgun.com/2011/06/26/lulzsec-over-release-battlefield-heroes-data\" target=\"_blank\" rel=\"noopener\">obtained and released over half a million usernames and passwords from the game Battlefield Heroes</a>. The passwords were stored as MD5 hashes with no salt and many were easily converted back to their plain text versions.",
+	"DataClasses":["Passwords","Usernames"],
+	"IsVerified":true,
+	"IsFabricated":false,
+	"IsSensitive":false,
+	"IsRetired":false,
+	"IsSpamList":false,
+	"LogoPath":"https://haveibeenpwned.com/Content/Images/PwnedLogos/BattlefieldHeroes.png"
+	}
+	]
+	`
+
+	err := json.Unmarshal([]byte(raw_breaches), &breach_struct)
 	if err != nil {
-		t.Fatalf("[Get All Breaches For Account] returned error: %v", err)
+		t.Fatalf("[TestBreachesStruct] returned error: %v", err)
 	}
 
 	want := []*Breach{
-		{Name: "000webhost"},
-		{Name: "Adobe"},
+		{
+			Name:         "Adobe",
+			Title:        "Adobe",
+			Domain:       "adobe.com",
+			BreachDate:   "2013-10-04",
+			AddedDate:    "2013-12-04T00:00Z",
+			ModifiedDate: "2013-12-04T00:00Z",
+			PwnCount:     152445165,
+			Description:  "In October 2013, 153 million Adobe accounts were breached with each containing an internal ID, username, email, <em>encrypted</em> password and a password hint in plain text. The password cryptography was poorly done and <a href=\"http://stricture-group.com/files/adobe-top100.txt\" target=\"_blank\" rel=\"noopener\">many were quickly resolved back to plain text</a>. The unencrypted hints also <a href=\"http://www.troyhunt.com/2013/11/adobe-credentials-and-serious.html\" target=\"_blank\" rel=\"noopener\">disclosed much about the passwords</a> adding further to the risk that hundreds of millions of Adobe customers already faced.",
+			DataClasses: &DataClasses{
+				"Email addresses",
+				"Password hints",
+				"Passwords",
+				"Usernames",
+			},
+			IsVerified:   true,
+			IsFabricated: false,
+			IsSensitive:  false,
+			IsRetired:    false,
+			IsSpamList:   false,
+			LogoPath:     "https://haveibeenpwned.com/Content/Images/PwnedLogos/Adobe.png",
+		},
+		{
+			Name:         "BattlefieldHeroes",
+			Title:        "Battlefield Heroes",
+			Domain:       "battlefieldheroes.com",
+			BreachDate:   "2011-06-26",
+			AddedDate:    "2014-01-23T13:10Z",
+			ModifiedDate: "2014-01-23T13:10Z",
+			PwnCount:     530270,
+			Description:  "In June 2011 as part of a final breached data dump, the hacker collective &quot;LulzSec&quot; <a href=\"http://www.rockpapershotgun.com/2011/06/26/lulzsec-over-release-battlefield-heroes-data\" target=\"_blank\" rel=\"noopener\">obtained and released over half a million usernames and passwords from the game Battlefield Heroes</a>. The passwords were stored as MD5 hashes with no salt and many were easily converted back to their plain text versions.",
+			DataClasses: &DataClasses{
+				"Passwords",
+				"Usernames",
+			},
+			IsVerified:   true,
+			IsFabricated: false,
+			IsSensitive:  false,
+			IsRetired:    false,
+			IsSpamList:   false,
+			LogoPath:     "https://haveibeenpwned.com/Content/Images/PwnedLogos/BattlefieldHeroes.png",
+		},
 	}
-	assert.Equal(want, account, "Expected equal value")
+
+	assert.Equal(want, breach_struct, "Expected equal value for Breaches in TestBreaches.")
 }
 
-func TestAllBreachedSites(t *testing.T) {
+func TestPastesStruct(t *testing.T) {
 	assert := assert.New(t)
 
-	mockHandler.HandleFunc("/breaches", func(w http.ResponseWriter, r *http.Request) {
-		checkHeader(t)(w, r)
-		fmt.Fprint(w, `[{"Name": "Adobe"}]`)
-	})
+	paste_struct := []*Paste{}
 
-	account, err := GetAllBreachedSites("adobe.com")
+	raw_pastes := `
+	[
+	{
+	"Source":"Pastebin",
+	"Id":"8Q0BvKD8",
+	"Title":"syslog",
+	"Date":"2014-03-04T19:14:54Z",
+	"EmailCount":139
+	},
+	{
+	"Source":"Pastie",
+	"Id":"7152479",
+	"Date":"2013-03-28T16:51:10Z",
+	"EmailCount":30
+	}
+	]
+	`
+
+	err := json.Unmarshal([]byte(raw_pastes), &paste_struct)
 	if err != nil {
-		t.Fatalf("[Get All Breached Sites] returned error: %v", err)
-	}
-
-	want := []*Breach{
-		{Name: "Adobe"},
-	}
-	assert.Equal(want, account, "they should be the same output.")
-}
-
-func TestGetBreachedSite(t *testing.T) {
-	assert := assert.New(t)
-
-	mockHandler.HandleFunc("/breach/Adobe", func(w http.ResponseWriter, r *http.Request) {
-		checkHeader(t)(w, r)
-		fmt.Fprint(w, `[{"Name": "Adobe"}]`)
-	})
-
-	account, err := GetBreachedSite("Adobe")
-	if err != nil {
-		t.Fatalf("[Get Breached Site] returned error: %v", err)
-	}
-
-	want := []*Breach{
-		{Name: "Adobe"},
-	}
-	assert.Equal(want, account, "they should be the same output.")
-}
-
-func TestGetDataClasses(t *testing.T) {
-	assert := assert.New(t)
-
-	mockHandler.HandleFunc("/dataclasses", func(w http.ResponseWriter, r *http.Request) {
-		checkHeader(t)(w, r)
-		fmt.Fprint(w, `["Account balances","Age groups"]`)
-	})
-
-	account, err := GetDataClasses()
-	if err != nil {
-		t.Fatalf("[Get All Data Classes] returned error: %v", err)
-	}
-
-	want := &DataClasses{
-		"Account balances",
-		"Age groups",
-	}
-	assert.Equal(want, account, "they should be the same output.")
-}
-
-func TestGetAllPastesForAccount(t *testing.T) {
-	assert := assert.New(t)
-
-	mockHandler.HandleFunc("/pasteaccount/test@example.com", func(w http.ResponseWriter, r *http.Request) {
-		checkHeader(t)(w, r)
-		fmt.Fprint(w, `[{"Source":"Pastebin","Id":"Ab2ZYrq4","EmailCount":48},{"Source":"Pastebin","Id":"46g62dvD","EmailCount":1670}]`)
-	})
-
-	account, err := GetAllPastesForAccount("test@example.com")
-	if err != nil {
-		t.Errorf("[Get All Breaches For Account] returned error: %v", err)
+		t.Fatalf("[TestPastesStruct] returned error: %v", err)
 	}
 
 	want := []*Paste{
 		{
 			Source:     "Pastebin",
-			ID:         "Ab2ZYrq4",
-			EmailCount: 48,
+			ID:         "8Q0BvKD8",
+			Title:      "syslog",
+			Date:       "2014-03-04T19:14:54Z",
+			EmailCount: 139,
 		},
 		{
-			Source:     "Pastebin",
-			ID:         "46g62dvD",
-			EmailCount: 1670,
+			Source:     "Pastie",
+			ID:         "7152479",
+			Date:       "2013-03-28T16:51:10Z",
+			EmailCount: 30,
 		},
 	}
-	assert.Equal(want, account, "they should be the same output.")
-}
 
-func TestPwnedPasswords(t *testing.T) {
-	assert := assert.New(t)
-
-	want := "2D8D1B3FAACCA6A3C6A91617B2FA32E2F57:1\n2DC183F740EE76F27B78EB39C8AD972A757:49938"
-
-	mockHandler.HandleFunc("/21BD1", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "2D8D1B3FAACCA6A3C6A91617B2FA32E2F57:1\n2DC183F740EE76F27B78EB39C8AD972A757:49938")
-	})
-
-	pwds, err := PwnedPasswords("21BD1")
-	if err != nil {
-		t.Errorf("[PwnedPasswords] returned error: %v", err)
-	}
-
-	assert.Equal(want, string(pwds), "they should be the same output.")
+	assert.Equal(want, paste_struct, "Expected equal value for Pastes in TestPastes.")
 }
