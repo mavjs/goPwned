@@ -33,9 +33,10 @@ jobs:
     - name: Run Go Test
       run: go test -v -mod=vendor -covermode atomic -coverprofile=covprofile ./...
 
-    - name: Coveralls GitHub Action
-      uses: coverallsapp/github-action@1.1.3
-      with:
-        path-to-lcov: covprofile
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Install goveralls
+      run: go install github.com/mattn/goveralls@latest
 
+    - name: Send coverage
+      env:
+        COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: goveralls -coverprofile=covprofile -service=github
