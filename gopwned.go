@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -104,6 +105,7 @@ func NewClient(httpClient *http.Client, token string) *Client {
 	return &Client{client: httpClient, Token: token, UserAgent: userAgent, BaseURL: baseURL, PwnPwdURL: pwnpwdURL}
 }
 
+// checkAPI
 func checkAPI(path string) bool {
 	switch {
 	default:
@@ -127,6 +129,7 @@ func (c *Client) newRequest(resource string, opts url.Values) (*http.Response, e
 		return nil, err
 	}
 
+	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.UserAgent)
 	if checkAPI(target.String()) {
 		if c.Token != "" {
@@ -137,7 +140,9 @@ func (c *Client) newRequest(resource string, opts url.Values) (*http.Response, e
 	}
 	req.Close = true
 
-	// Note: An error is returned if caused by client policy (such as CheckRedirect), or failure to speak HTTP (such as a network connectivity problem). A non-2xx status code doesn't cause an error.
+	// Note: An error is returned if caused by client policy (such as CheckRedirect),
+	// or failure to speak HTTP (such as a network connectivity problem).
+	// A non-2xx status code doesn't cause an error.
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -150,7 +155,7 @@ func (c *Client) newRequest(resource string, opts url.Values) (*http.Response, e
 	return resp, nil
 }
 
-func (c *Client) newPwdRequest(resource string, opts url.Values) (*http.Response, error) {
+func (c *Client) newPwdRequest(resource string, opts url.Values, addPadding bool) (*http.Response, error) {
 	target, err := c.PwnPwdURL.Parse(resource)
 	if err != nil {
 		return nil, err
@@ -163,6 +168,9 @@ func (c *Client) newPwdRequest(resource string, opts url.Values) (*http.Response
 	if err != nil {
 		return nil, err
 	}
+	if addPadding {
+		req.Header.Set("Add-Padding", strconv.FormatBool(addPadding))
+	}
 	req.Header.Set("User-Agent", c.UserAgent)
 	if checkAPI(target.String()) {
 		if c.Token != "" {
@@ -173,7 +181,9 @@ func (c *Client) newPwdRequest(resource string, opts url.Values) (*http.Response
 	}
 	req.Close = true
 
-	// Note: An error is returned if caused by client policy (such as CheckRedirect), or failure to speak HTTP (such as a network connectivity problem). A non-2xx status code doesn't cause an error.
+	// Note: An error is returned if caused by client policy (such as CheckRedirect),
+	// or failure to speak HTTP (such as a network connectivity problem).
+	// A non-2xx status code doesn't cause an error.
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -198,15 +208,15 @@ func (c *Client) getBreaches(resource string, opts url.Values) ([]*Breach, error
 	return breaches, err
 }
 
-// GetAllBreaches - returns a list of all breaches of a particular account has
+// GetAccountBreaches - returns a list of all breaches of a particular account has
 // been involved in. This function checks if an HIBP API key is provided, if not
 // it will throw an error.
 // The function accepts 4 arguments, with 1 of them being required. They are:
 //     - account - The account is not case sensitive and is URL encoded before sending to the endpoint. (required)
 //     - domain - Filters the result set to only breaches against the domain specified. (e.g. adobe.com)
-//     - untruncate - Instructs the API to return the full breach data instead of, by default, only the name of the breach.
+//     - truncate - Instructs the API to return the full breach data instead of, by default, only the name of the breach.
 //     - unverified - Instructs the API not to include unverified breaches instead of, by default, returning both verified and unverified.
-func (c *Client) GetAllBreaches(account, domain string, truncate, unverified bool) ([]*Breach, error) {
+func (c *Client) GetAccountBreaches(account, domain string, truncate, unverified bool) ([]*Breach, error) {
 
 	resource := fmt.Sprintf("breachedaccount/%s", url.QueryEscape(account))
 
@@ -215,38 +225,46 @@ func (c *Client) GetAllBreaches(account, domain string, truncate, unverified boo
 		opts.Set("domain", domain)
 	}
 
-	if !truncate {
-		opts.Set("truncateResponse", "false")
-	}
-
-	if unverified {
-		opts.Set("includeUnverified", "true")
-	}
+	opts.Set("truncateResponse", strconv.FormatBool(truncate))
+	opts.Set("includeUnverified", strconv.FormatBool(unverified))
 
 	return c.getBreaches(resource, opts)
 }
 
-// GetAllBreachedSites - returns a list of all details of each breach. A breach:
+// GetBreachedSites - returns a list of all details of each breach. A breach:
 // an instance of a system having been compromised and data disclosed.
 // This function accepts an option argument which can be used to filter on a
-// specific breached domain. (e.g. adobe.com)
-func (c *Client) GetAllBreachedSites(domain string) ([]*Breach, error) {
+// specific breached domain (e.g. adobe.com) which may not be the same as the breach "Title"
+func (c *Client) GetBreachedSites(domainFilter string) ([]*Breach, error) {
 	resource := "breaches"
 
 	opts := url.Values{}
-	if domain != "" {
-		opts.Set("domain", domain)
+	if domainFilter != "" {
+		opts.Set("domain", domainFilter)
 	}
 
 	return c.getBreaches(resource, opts)
 }
 
-// GetBreachedSite - returns all details of a single breach by its breach "name".
+// GetABreachedSite - returns all details of a single breach by its breach "name".
 // This breach "name" is a stable value in the haveibeenpwned.com data-sets.
 // An example of a breach "name" would be "Adobe" instead of "adobe.com".
-func (c *Client) GetBreachedSite(site string) ([]*Breach, error) {
+func (c *Client) GetABreachedSite(site string) (*Breach, error) {
+	if site == "" {
+		return nil, errors.New("a breach name was not provided")
+	}
+
 	resource := fmt.Sprintf("breach/%s", site)
-	return c.getBreaches(resource, nil)
+
+	resp, err := c.newRequest(resource, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var breaches *Breach
+	err = json.NewDecoder(resp.Body).Decode(&breaches)
+	return breaches, err
 }
 
 // GetDataClasses - returns an alphabetically ordered list of data classes exposed
@@ -266,11 +284,11 @@ func (c *Client) GetDataClasses() (*DataClasses, error) {
 	return dataclasses, err
 }
 
-// GetAllPastes - returns a list of pastes based on the email provided.
+// GetAccountPastes - returns a list of pastes based on the email provided.
 // This function checks if an HIBP API key is provided, if not it will throw an
 // error.
 //
-func (c *Client) GetAllPastes(email string) ([]*Paste, error) {
+func (c *Client) GetAccountPastes(email string) ([]*Paste, error) {
 
 	resource := fmt.Sprintf("pasteaccount/%s", email)
 
@@ -285,13 +303,13 @@ func (c *Client) GetAllPastes(email string) ([]*Paste, error) {
 	return pastes, err
 }
 
-// PwnedPasswords - returns a list of suffixes that has a similar prefix hash,
+// GetPwnedPasswords - returns a list of suffixes that has a similar prefix hash,
 // i.e., the first 5 characters of SHA-1 hash of the password and the count of
 // how many times that suffix has been seen in the data set.
 // This function requires exactly 1 argument which is the 1st 5 characters of
 // the hash of the password as a string.
-func (c *Client) PwnedPasswords(chars string) ([]byte, error) {
-	resp, err := c.newPwdRequest(chars, nil)
+func (c *Client) GetPwnedPasswords(chars string, addPadding bool) ([]byte, error) {
+	resp, err := c.newPwdRequest(chars, nil, addPadding)
 	if err != nil {
 		return nil, err
 	}
