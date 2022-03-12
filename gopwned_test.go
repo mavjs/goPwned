@@ -3,10 +3,20 @@ package gopwned
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestNewClient(t *testing.T) {
+	var token = ""
+	c := NewClient(nil, token)
+
+	if got, want := c.Token, token; got != want {
+		t.Errorf("[TestNewClient] Token is %v, want %v", got, want)
+	}
+}
 
 func TestUnAuthReq(t *testing.T) {
 	assert := assert.New(t)
@@ -15,23 +25,106 @@ func TestUnAuthReq(t *testing.T) {
 	want_error := errors.New("the function you're trying to request requires an API key")
 
 	gopwn := NewClient(nil, "")
-	got_result, got_err := gopwn.GetAllBreaches("multiple-breaches@hibp-integration-tests.com", "", true, false)
+	got_result, got_err := gopwn.GetAccountBreaches("multiple-breaches@hibp-integration-tests.com", "", true, false)
 	if got_err != nil {
-		assert.Equal(want_error, got_err, "[Error Test] The test expected a failure in authentication due to missing API key.")
+		assert.Equal(want_error, got_err, "[TestUnAuthReq ErrorReturn Test] The test expected a failure in authentication due to missing API key.")
 	}
-	assert.Equal(want_result, got_result, "[Return Test] The test expected a failure in authentication due to missing API key.")
+	assert.Equal(want_result, got_result, "[TestUnAuthReq ResultReturn Test] The test expected a nil return result, but received something else.")
 }
 
-func TestUnAuthzAPI(t *testing.T) {
+func TestWrongAPIKey(t *testing.T) {
 	assert := assert.New(t)
 
 	want_error := errors.New(respCodes[401])
 
 	gopwn := NewClient(nil, "InvalidAPIKey")
-	_, got_err := gopwn.GetAllBreaches("account-exists@hibp-integration-tests.com", "", true, false)
+	_, got_err := gopwn.GetAccountBreaches("account-exists@hibp-integration-tests.com", "", true, false)
 	if got_err != nil {
-		assert.Equal(want_error, got_err, "The test expected to return a message based on HTTP Status Code 401.")
+		assert.Equal(want_error, got_err, "[TestWrongAPIKey] The test expected to return a message based on HTTP Status Code 401.")
 	}
+}
+
+func TestAccountExists(t *testing.T) {
+	HIBP_API_KEY := os.Getenv("HIBP_API_KEY")
+	if HIBP_API_KEY == "" {
+		t.Skip("[TestAccountExists] Skipping test as API key was not provided.")
+	}
+
+	assert := assert.New(t)
+	want := []*Breach{
+		{
+			Name:         "Adobe",
+			Title:        "",
+			Domain:       "",
+			BreachDate:   "",
+			AddedDate:    "",
+			ModifiedDate: "",
+			PwnCount:     0,
+			Description:  "",
+			DataClasses:  nil,
+			IsVerified:   false,
+			IsFabricated: false,
+			IsSensitive:  false,
+			IsRetired:    false,
+			IsSpamList:   false,
+			LogoPath:     "",
+		},
+	}
+
+	gopwn := NewClient(nil, HIBP_API_KEY)
+	got, err := gopwn.GetAccountBreaches("account-exists@hibp-integration-tests.com", "", true, false)
+	if err != nil {
+		t.Errorf("[TestWithAPICheckAccountExists] Returned errors: %v", err)
+	}
+	assert.Equal(want, got, "[TestWithAPICheckAccountExists] Expected a non nil return of a breach.")
+}
+
+func TestNotActiveBreach(t *testing.T) {
+	HIBP_API_KEY := os.Getenv("HIBP_API_KEY")
+	if HIBP_API_KEY == "" {
+		t.Skip("[TestNotActiveBreach] Skipping test as API key was not provided.")
+	}
+
+	assert := assert.New(t)
+
+	gopwn := NewClient(nil, HIBP_API_KEY)
+
+	got, err := gopwn.GetAccountBreaches("not-active-breach@hibp-integration-tests.com", "", true, false)
+	if err != nil {
+		assert.EqualError(err, "Not found — the account could not be found and has therefore not been pwned")
+	}
+
+	if got != nil {
+		t.Errorf("[TestNotActiveBreach] Expected no breaches to be returned. Got: %v", got)
+	}
+}
+
+func TestPasteBreach(t *testing.T) {
+	HIBP_API_KEY := os.Getenv("HIBP_API_KEY")
+	if HIBP_API_KEY == "" {
+		t.Skip("[TestPasteBreach] Skipping test as API key was not provided.")
+	}
+
+	assert := assert.New(t)
+
+	want := []*Paste{
+		{
+			Source:     "Pastebin",
+			ID:         "uQNGpAxp",
+			Title:      "",
+			Date:       "2018-06-12T00:51:08Z",
+			EmailCount: 1117,
+		},
+	}
+	gopwn := NewClient(nil, HIBP_API_KEY)
+
+	got, err := gopwn.GetAccountPastes("paste-sensitive-breach@hibp-integration-tests.com")
+	if err != nil {
+		t.Errorf("[TestPasteBreach] Expected no pastes to be returned. Got: %v", got)
+
+	}
+
+	assert.Equal(want, got, "[TestPasteBreach] Expected a paste to be returned.")
 }
 
 func TestBreachesStruct(t *testing.T) {
