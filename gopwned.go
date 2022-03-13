@@ -39,6 +39,7 @@ type (
 		IsSensitive  bool         `json:"IsSensitive,omitempty"`
 		IsRetired    bool         `json:"IsRetired,omitempty"`
 		IsSpamList   bool         `json:"IsSpamList,omitempty"`
+		IsMalware    bool         `json:"IsMalware,omitempty"`
 		LogoPath     string       `json:"LogoPath,omitempty"`
 	}
 
@@ -155,30 +156,22 @@ func (c *Client) newRequest(resource string, opts url.Values) (*http.Response, e
 	return resp, nil
 }
 
-func (c *Client) newPwdRequest(resource string, opts url.Values, addPadding bool) (*http.Response, error) {
+func (c *Client) newPwdRequest(resource string, addPadding bool) (*http.Response, error) {
 	target, err := c.PwnPwdURL.Parse(resource)
 	if err != nil {
 		return nil, err
 	}
 
-	if opts != nil {
-		target.RawQuery = opts.Encode()
-	}
 	req, err := http.NewRequest("GET", target.String(), nil)
 	if err != nil {
 		return nil, err
 	}
+
 	if addPadding {
 		req.Header.Set("Add-Padding", strconv.FormatBool(addPadding))
 	}
 	req.Header.Set("User-Agent", c.UserAgent)
-	if checkAPI(target.String()) {
-		if c.Token != "" {
-			req.Header.Set("hibp-api-key", c.UserAgent)
-		} else {
-			return nil, errors.New("the function you're trying to request requires an API key")
-		}
-	}
+
 	req.Close = true
 
 	// Note: An error is returned if caused by client policy (such as CheckRedirect),
@@ -309,7 +302,7 @@ func (c *Client) GetAccountPastes(email string) ([]*Paste, error) {
 // This function requires exactly 1 argument which is the 1st 5 characters of
 // the hash of the password as a string.
 func (c *Client) GetPwnedPasswords(chars string, addPadding bool) ([]byte, error) {
-	resp, err := c.newPwdRequest(chars, nil, addPadding)
+	resp, err := c.newPwdRequest(chars, addPadding)
 	if err != nil {
 		return nil, err
 	}
