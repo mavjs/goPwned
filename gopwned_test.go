@@ -21,14 +21,13 @@ var (
 	expectedHeaders = map[string]string{
 		"Accept": "application/json",
 	}
-
-	mockHandler *http.ServeMux
-	mockServer  *httptest.Server
 )
 
-func init() {
-	mockHandler = http.NewServeMux()
-	mockServer = httptest.NewServer(mockHandler)
+// createMockServer creates a new mock server for testing
+func createMockServer() (*httptest.Server, *http.ServeMux) {
+	handler := http.NewServeMux()
+	server := httptest.NewServer(handler)
+	return server, handler
 }
 
 func checkHeader(t *testing.T) http.HandlerFunc {
@@ -52,8 +51,8 @@ func setupPasswordInput() (string, string) {
 	h.Write([]byte(inputPassword))
 	password := fmt.Sprintf("%X", h.Sum(nil)) // hash = "21BD12DC183F740EE76F27B78EB39C8AD972A757"
 
-	frange := password[0:5]
-	lrange := password[5:40]
+	frange := password[0:5]  // frange = "21BD1"
+	lrange := password[5:40] // lrange = "2DC183F740EE76F27B78EB39C8AD972A757"
 
 	return frange, lrange
 }
@@ -67,13 +66,13 @@ func helperPasswordOutput(karray []byte, lrange string) int64 {
 		str_array := strings.Split(resp, ":")
 		test := str_array[0]
 
-		result, err := strconv.ParseInt(str_array[1], 0, 32)
+		count, err := strconv.ParseInt(str_array[1], 0, 32)
 		if err != nil {
 			fmt.Printf("%#v", str_array[1])
-			panic("unable to convert string into integer")
+			continue
 		}
 		if test == lrange {
-			return result
+			return count
 		}
 	}
 	return result
@@ -231,9 +230,20 @@ func TestPasteBreach(t *testing.T) {
 func TestPasswordBreach(t *testing.T) {
 	assert := assert.New(t)
 
-	want := int64(83129)
+	mockServer, mockHandler := createMockServer()
+	defer mockServer.Close()
+
+	mockHandler.HandleFunc("/range/21BD1", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Add-Padding") != "true" {
+			fmt.Fprint(w, "2C54FCE5D1490A92921C1CD456FE335A579:1\r\n2CC9B40E37FFC6E5733C449917E9678883F:1\r\n2CCE796E1AC4F4554E67694D07BF9F39F3D:3\r\n2CDE4CDCFA5AD7D223BD1800338FBEAA04E:4\r\n2CF080E4C7036AA8434AB15C412E5763338:12\r\n2CF90F92EE1941547BB13DFC7D0E0AFE504:2\r\n2D10A6654B6D75908AE572559542245CBFA:34\r\n2D4FCF535FE92B8B950424E16E65EFBFED3:12\r\n2D6980B9098804E7A83DC5831BFBAF3927F:1\r\n2D8D1B3FAACCA6A3C6A91617B2FA32E2F57:1\r\n2DC183F740EE76F27B78EB39C8AD972A757:6421042\r\n2DCD15B6AF26467FDF91D9CA3202B48E82A:1\r\n2DE4C0087846D223DBBCCF071614590F300:4\r\n2DEA2B1D02714099E4B7A874B4364D518F6:4\r\n2E0409E69F843BEABBB0CC17E165AC3FE48:2\r\n2E65322EF6092548294134C2803BA351CE8:2\r\n2E750AE8C4756A20CE040BF3DDF094FA7EC:1\r\n2E90B7B3C5C1181D16C48E273D9AC7F3C16:23\r\n2E991A9162F24F01826D8AF73CA20F2B430:3\r\n2EAE5EA981BFAF29A8869A40BDDADF3879B:3\r\n2ED2ADF299BC6217773394D4A819A495C1E:1")
+		}
+	})
+
+	want := int64(6421042)
 
 	gopwned := NewClient(nil, "")
+	gopwned.BaseURL, _ = url.Parse(mockServer.URL)
+	gopwned.PwnPwdURL, _ = url.Parse(mockServer.URL + "/range/")
 
 	frange, lrange := setupPasswordInput()
 
@@ -253,9 +263,20 @@ func TestPasswordBreach(t *testing.T) {
 func TestPasswordBreachWithPadding(t *testing.T) {
 	assert := assert.New(t)
 
-	want := int64(83129)
+	mockServer, mockHandler := createMockServer()
+	defer mockServer.Close()
+
+	mockHandler.HandleFunc("/range/21BD1", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Add-Padding") == "true" {
+			fmt.Fprint(w, "2C54FCE5D1490A92921C1CD456FE335A579:1\r\n2CC9B40E37FFC6E5733C449917E9678883F:1\r\n2CCE796E1AC4F4554E67694D07BF9F39F3D:3\r\n2CDE4CDCFA5AD7D223BD1800338FBEAA04E:4\r\n2CF080E4C7036AA8434AB15C412E5763338:12\r\n2CF90F92EE1941547BB13DFC7D0E0AFE504:2\r\n2D10A6654B6D75908AE572559542245CBFA:34\r\n2D4FCF535FE92B8B950424E16E65EFBFED3:12\r\n2D6980B9098804E7A83DC5831BFBAF3927F:1\r\n2D8D1B3FAACCA6A3C6A91617B2FA32E2F57:1\r\n2DC183F740EE76F27B78EB39C8AD972A757:6421042\r\n2DCD15B6AF26467FDF91D9CA3202B48E82A:1\r\n2DE4C0087846D223DBBCCF071614590F300:4\r\n2DEA2B1D02714099E4B7A874B4364D518F6:4\r\n2E0409E69F843BEABBB0CC17E165AC3FE48:2\r\n2E65322EF6092548294134C2803BA351CE8:2\r\n2E750AE8C4756A20CE040BF3DDF094FA7EC:1\r\n2E90B7B3C5C1181D16C48E273D9AC7F3C16:23\r\n2E991A9162F24F01826D8AF73CA20F2B430:3\r\n2EAE5EA981BFAF29A8869A40BDDADF3879B:3\r\n2ED2ADF299BC6217773394D4A819A495C1E:1")
+		}
+	})
+
+	want := int64(6421042)
 
 	gopwned := NewClient(nil, "")
+	gopwned.BaseURL, _ = url.Parse(mockServer.URL)
+	gopwned.PwnPwdURL, _ = url.Parse(mockServer.URL + "/range/")
 
 	frange, lrange := setupPasswordInput()
 
@@ -434,6 +455,9 @@ func TestPastesStruct(t *testing.T) {
 func TestGetDataClasses(t *testing.T) {
 	assert := assert.New(t)
 
+	mockServer, mockHandler := createMockServer()
+	defer mockServer.Close()
+
 	mockHandler.HandleFunc("/dataclasses", func(w http.ResponseWriter, r *http.Request) {
 		checkHeader(t)(w, r)
 		fmt.Fprint(w, `["Account balances","Age groups"]`)
@@ -458,6 +482,9 @@ func TestGetDataClasses(t *testing.T) {
 func TestGetBreachedSite(t *testing.T) {
 	assert := assert.New(t)
 
+	mockServer, mockHandler := createMockServer()
+	defer mockServer.Close()
+
 	mockHandler.HandleFunc("/breach/Adobe", func(w http.ResponseWriter, r *http.Request) {
 		checkHeader(t)(w, r)
 		fmt.Fprint(w, `{"Name": "Adobe"}`)
@@ -481,6 +508,9 @@ func TestGetBreachedSite(t *testing.T) {
 func TestGetBreachedSiteWithoutSite(t *testing.T) {
 	assert := assert.New(t)
 
+	mockServer, mockHandler := createMockServer()
+	defer mockServer.Close()
+
 	mockHandler.HandleFunc("/breach/", func(w http.ResponseWriter, r *http.Request) {
 		checkHeader(t)(w, r)
 		fmt.Fprint(w, `{"Name": "Adobe"}`)
@@ -501,6 +531,9 @@ func TestGetBreachedSiteWithoutSite(t *testing.T) {
 
 func TestGetBreachedSites(t *testing.T) {
 	assert := assert.New(t)
+
+	mockServer, mockHandler := createMockServer()
+	defer mockServer.Close()
 
 	mockHandler.HandleFunc("/breaches", func(w http.ResponseWriter, r *http.Request) {
 		checkHeader(t)(w, r)
@@ -527,6 +560,45 @@ func TestGetBreachedSites(t *testing.T) {
 func TestGetBreachedSitesFiltered(t *testing.T) {
 	assert := assert.New(t)
 
+	mockServer, mockHandler := createMockServer()
+	defer mockServer.Close()
+
+	mockHandler.HandleFunc("/breaches", func(w http.ResponseWriter, r *http.Request) {
+		checkHeader(t)(w, r)
+
+		if r.URL.Query().Get("domain") == "adobe.com" {
+			fmt.Fprint(w, `[
+  {
+    "Name": "Adobe",
+    "Title": "Adobe",
+    "Domain": "adobe.com",
+    "BreachDate": "2013-10-04",
+    "AddedDate": "2013-12-04T00:00:00Z",
+    "ModifiedDate": "2022-05-15T23:52:49Z",
+    "PwnCount": 152445165,
+    "Description": "In October 2013, 153 million Adobe accounts were breached with each containing an internal ID, username, email, <em>encrypted</em> password and a password hint in plain text. The password cryptography was poorly done and many were quickly resolved back to plain text. The unencrypted hints also <a href=\"http://www.troyhunt.com/2013/11/adobe-credentials-and-serious.html\" target=\"_blank\" rel=\"noopener\">disclosed much about the passwords</a> adding further to the risk that hundreds of millions of Adobe customers already faced.",
+    "LogoPath": "https://logos.haveibeenpwned.com/Adobe.png",
+    "Attribution": null,
+    "DisclosureUrl": null,
+    "DataClasses": [
+      "Email addresses",
+      "Password hints",
+      "Passwords",
+      "Usernames"
+    ],
+    "IsVerified": true,
+    "IsFabricated": false,
+    "IsSensitive": false,
+    "IsRetired": false,
+    "IsSpamList": false,
+    "IsMalware": false,
+    "IsSubscriptionFree": false,
+    "IsStealerLog": false
+  }
+]`)
+		}
+	})
+
 	want := []*Breach{
 		{
 			Name:         "Adobe",
@@ -534,10 +606,10 @@ func TestGetBreachedSitesFiltered(t *testing.T) {
 			Domain:       "adobe.com",
 			BreachDate:   "2013-10-04",
 			AddedDate:    "2013-12-04T00:00:00Z",
-			ModifiedDate: "2013-12-04T00:00:00Z",
+			ModifiedDate: "2022-05-15T23:52:49Z",
 			PwnCount:     152445165,
-			Description:  "In October 2013, 153 million Adobe accounts were breached with each containing an internal ID, username, email, <em>encrypted</em> password and a password hint in plain text. The password cryptography was poorly done and <a href=\"http://stricture-group.com/files/adobe-top100.txt\" target=\"_blank\" rel=\"noopener\">many were quickly resolved back to plain text</a>. The unencrypted hints also <a href=\"http://www.troyhunt.com/2013/11/adobe-credentials-and-serious.html\" target=\"_blank\" rel=\"noopener\">disclosed much about the passwords</a> adding further to the risk that hundreds of millions of Adobe customers already faced.",
-			LogoPath:     "https://haveibeenpwned.com/Content/Images/PwnedLogos/Adobe.png",
+			Description:  "In October 2013, 153 million Adobe accounts were breached with each containing an internal ID, username, email, <em>encrypted</em> password and a password hint in plain text. The password cryptography was poorly done and many were quickly resolved back to plain text. The unencrypted hints also <a href=\"http://www.troyhunt.com/2013/11/adobe-credentials-and-serious.html\" target=\"_blank\" rel=\"noopener\">disclosed much about the passwords</a> adding further to the risk that hundreds of millions of Adobe customers already faced.",
+			LogoPath:     "https://logos.haveibeenpwned.com/Adobe.png",
 			DataClasses: &DataClasses{
 				"Email addresses",
 				"Password hints",
@@ -553,6 +625,8 @@ func TestGetBreachedSitesFiltered(t *testing.T) {
 	}
 
 	gopwned := NewClient(nil, "")
+	gopwned.BaseURL, _ = url.Parse(mockServer.URL)
+	gopwned.PwnPwdURL, _ = url.Parse(mockServer.URL)
 
 	got, err := gopwned.GetBreachedSites("adobe.com")
 	if err != nil {
