@@ -55,6 +55,11 @@ type (
 	// DataClasses holds all data classes exposed from breaches returned
 	// from the API.
 	DataClasses []string
+
+	// BreachedDomain represents a map of email aliases to their associated breaches.
+	// The key is the email alias (local part before @) and the value is a slice of
+	// breach names the alias has appeared in.
+	BreachedDomain map[string][]string
 )
 
 const (
@@ -205,10 +210,10 @@ func (c *Client) getBreaches(resource string, opts url.Values) ([]*Breach, error
 // been involved in. This function checks if an HIBP API key is provided, if not
 // it will throw an error.
 // The function accepts 4 arguments, with 1 of them being required. They are:
-//     - account - The account is not case sensitive and is URL encoded before sending to the endpoint. (required)
-//     - domain - Filters the result set to only breaches against the domain specified. (e.g. adobe.com)
-//     - truncate - Instructs the API to return the full breach data instead of, by default, only the name of the breach.
-//     - unverified - Instructs the API not to include unverified breaches instead of, by default, returning both verified and unverified.
+//   - account - The account is not case sensitive and is URL encoded before sending to the endpoint. (required)
+//   - domain - Filters the result set to only breaches against the domain specified. (e.g. adobe.com)
+//   - truncate - Instructs the API to return the full breach data instead of, by default, only the name of the breach.
+//   - unverified - Instructs the API not to include unverified breaches instead of, by default, returning both verified and unverified.
 func (c *Client) GetAccountBreaches(account, domain string, truncate, unverified bool) ([]*Breach, error) {
 
 	resource := fmt.Sprintf("breachedaccount/%s", url.QueryEscape(account))
@@ -280,7 +285,6 @@ func (c *Client) GetDataClasses() (*DataClasses, error) {
 // GetAccountPastes - returns a list of pastes based on the email provided.
 // This function checks if an HIBP API key is provided, if not it will throw an
 // error.
-//
 func (c *Client) GetAccountPastes(email string) ([]*Paste, error) {
 
 	resource := fmt.Sprintf("pasteaccount/%s", email)
@@ -294,6 +298,33 @@ func (c *Client) GetAccountPastes(email string) ([]*Paste, error) {
 	var pastes []*Paste
 	err = json.NewDecoder(resp.Body).Decode(&pastes)
 	return pastes, err
+}
+
+// GetBreachedDomain - returns all breached email addresses (as aliases) for a given domain.
+// This function requires an HIBP API key and the domain being queried must be verified
+// on the HIBP domain search dashboard.
+// The function returns a BreachedDomain map where keys are email aliases and values
+// are slices of breach names the alias has appeared in.
+// Possible errors:
+//   - UnauthorizedError: if API key is missing or invalid (HTTP 401)
+//   - DomainNotVerifiedError: if domain is not verified on HIBP (HTTP 403)
+//   - NotFoundError: if domain has no breached addresses (HTTP 404)
+func (c *Client) GetBreachedDomain(domain string) (BreachedDomain, error) {
+	if domain == "" {
+		return nil, errors.New("domain cannot be empty")
+	}
+
+	resource := fmt.Sprintf("breacheddomain/%s", url.QueryEscape(domain))
+
+	resp, err := c.newRequest(resource, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var breachedDomain BreachedDomain
+	err = json.NewDecoder(resp.Body).Decode(&breachedDomain)
+	return breachedDomain, err
 }
 
 // GetPwnedPasswords - returns a list of suffixes that has a similar prefix hash,

@@ -635,3 +635,29 @@ func TestGetBreachedSitesFiltered(t *testing.T) {
 
 	assert.Equal(want, got, "[TestGetBreachedSitesFiltered] Expected equal value for breached sites.")
 }
+
+func TestGetBreachedDomain_Success(t *testing.T) {
+	assert := assert.New(t)
+
+	mockServer, mockHandler := createMockServer()
+	defer mockServer.Close()
+
+	mockHandler.HandleFunc("/breacheddomain/test.com", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"alias1":["Adobe"],"alias2":["Adobe","Gawker"]}`)
+	})
+
+	gopwned := NewClient(nil, "test-key")
+	gopwned.BaseURL, _ = url.Parse(mockServer.URL)
+	gopwned.PwnPwdURL, _ = url.Parse(mockServer.URL)
+
+	got, err := gopwned.GetBreachedDomain("test.com")
+	if err != nil {
+		t.Errorf("[TestGetBreachedDomain_Success] Unexpected error: %v", err)
+	}
+
+	want := BreachedDomain{
+		"alias1": []string{"Adobe"},
+		"alias2": []string{"Adobe", "Gawker"},
+	}
+	assert.Equal(want, got, "[TestGetBreachedDomain_Success] Expected equal breached domain map")
+}
