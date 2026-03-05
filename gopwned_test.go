@@ -636,80 +636,11 @@ func TestGetBreachedSitesFiltered(t *testing.T) {
 	assert.Equal(want, got, "[TestGetBreachedSitesFiltered] Expected equal value for breached sites.")
 }
 
-// func TestGetBreachedDomain_Unauthorized(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	gopwn := NewClient(nil, "")
-
-// 	got, err := gopwn.GetBreachedDomain("example.com")
-// 	if err != nil {
-// 		t.Fatal("[TestGetBreachedDomain_Unauthorized] Expected an UnauthorizedError but got nil")
-// 	}
-
-// 	_, ok := err.(UnauthorizedError)
-// 	assert.True(ok, "[TestGetBreachedDomain_Unauthorized] Expected UnauthorizedError type")
-// }
-
-// func TestGetBreachedDomain_InvalidAPIKey(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	gopwn := NewClient(nil, "InvalidAPIKey")
-// 	_, err := gopwn.GetBreachedDomain("example.com")
-
-// 	if err == nil {
-// 		t.Fatal("[TestGetBreachedDomain_InvalidAPIKey] Expected an UnauthorizedError but got nil")
-// 	}
-
-// 	_, ok := err.(UnauthorizedError)
-// 	assert.True(ok, "[TestGetBreachedDomain_InvalidAPIKey] Expected UnauthorizedError type")
-// }
-
-// func TestGetBreachedDomain_NotFound(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	mockHandler.HandleFunc("/breacheddomain/nonexistent.com", func(w http.ResponseWriter, r *http.Request) {
-// 		w.WriteHeader(http.StatusNotFound)
-// 		fmt.Fprint(w, `{}`)
-// 	})
-
-// 	gopwned := NewClient(nil, "test-key")
-// 	gopwned.BaseURL, _ = url.Parse(mockServer.URL)
-// 	gopwned.PwnPwdURL, _ = url.Parse(mockServer.URL)
-
-// 	got, err := gopwned.GetBreachedDomain("nonexistent.com")
-// 	if err == nil {
-// 		t.Fatal("[TestGetBreachedDomain_NotFound] Expected NotFoundError but got nil")
-// 	}
-// }
-
-// func TestGetBreachedDomain_DomainNotVerified(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	mockHandler.HandleFunc("/breacheddomain/unverified.com", func(w http.ResponseWriter, r *http.Request) {
-// 		w.WriteHeader(http.StatusForbidden)
-// 		fmt.Fprint(w, `{}`)
-// 	})
-
-// 	gopwned := NewClient(nil, "test-key")
-// 	gopwned.BaseURL, _ = url.Parse(mockServer.URL)
-// 	gopwned.PwnPwdURL, _ = url.Parse(mockServer.URL)
-
-// 	got, err := gopwned.GetBreachedDomain("unverified.com")
-
-// 	if err == nil {
-// 		t.Fatal("[TestGetBreachedDomain_DomainNotVerified] Expected DomainNotVerifiedError but got nil")
-// 	}
-
-// 	_, ok := err.(DomainNotVerifiedError)
-// 	assert.True(ok, "[TestGetBreachedDomain_DomainNotVerified] Expected DomainNotVerifiedError type")
-
-// 	if got != nil {
-// 		t.Errorf("[TestGetBreachedDomain_DomainNotVerified] Expected nil map. Got: %v", got)
-// 	}
-// }
-
 func TestGetBreachedDomain_Success(t *testing.T) {
 	assert := assert.New(t)
+
+	mockServer, mockHandler := createMockServer()
+	defer mockServer.Close()
 
 	mockHandler.HandleFunc("/breacheddomain/test.com", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"alias1":["Adobe"],"alias2":["Adobe","Gawker"]}`)
@@ -730,40 +661,3 @@ func TestGetBreachedDomain_Success(t *testing.T) {
 	}
 	assert.Equal(want, got, "[TestGetBreachedDomain_Success] Expected equal breached domain map")
 }
-
-// func TestGetBreachedDomain_EmptyDomain(t *testing.T) {
-// 	assert := assert.New(t)
-
-// 	gopwned := NewClient(nil, "test-key")
-// 	_, err := gopwned.GetBreachedDomain("")
-
-// 	if err == nil {
-// 		t.Fatal("[TestGetBreachedDomain_EmptyDomain] Expected an error for empty domain")
-// 	}
-
-// 	assert.EqualError(err, "domain cannot be empty", "[TestGetBreachedDomain_EmptyDomain] Expected 'domain cannot be empty' error")
-// }
-
-// func TestGetBreachedDomain_Integration(t *testing.T) {
-// 	HIBP_API_KEY := os.Getenv("HIBP_API_KEY")
-// 	if HIBP_API_KEY == "" {
-// 		t.Skip("[TestGetBreachedDomain_Integration] Skipped test as API key was not provided.")
-// 	}
-
-// 	// Note: This test requires a verified domain on HIBP. For testing purposes,
-// 	// we're testing with the integration test domain if available, or skipping.
-// 	// In a real scenario, only verified domains would return data.
-
-// 	gopwn := NewClient(nil, HIBP_API_KEY)
-
-// 	// Test with a domain that should exist on HIBP but likely has no breaches
-// 	// or might return 403 if not verified
-// 	got, err := gopwn.GetBreachedDomain("hibp-integration-tests.com")
-
-// 	// The domain might not be verified, so we accept either NotFoundError, DomainNotVerifiedError, or a valid result
-// 	if err != nil {
-// 		t.Errorf("[TestGetBreachedDomain_Integration] Unexpected error: %v", err)
-// 	} else {
-// 		t.Logf("[TestGetBreachedDomain_Integration] Successfully retrieved breached domain data: %v", got)
-// 	}
-// }
